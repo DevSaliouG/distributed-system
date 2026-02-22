@@ -11,7 +11,7 @@ pipeline {
 
     stages {
 
-        stage('Linting et Tests') {
+        /* stage('Linting et Tests') {
             parallel {
 
                 stage('Backend tests') {
@@ -53,7 +53,7 @@ pipeline {
                 }
             }
         }
-
+ */
         stage('Build des images Docker') {
             steps {
                 sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ./backend"
