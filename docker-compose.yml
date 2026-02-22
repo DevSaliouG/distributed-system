@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # Service PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: s4liou
+      POSTGRES_PASSWORD: s4liou@1234
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U s4liou -d ecommerce"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service Backend Django
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: django_backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://s4liou:s4liou@1234@postgres:5432/ecommerce
+      DJANGO_SECRET_KEY: maCleSecretePourLeDev
+      DJANGO_DEBUG: "False"
+    volumes:
+      - ./backend:/home/s4liou/app
+      - static_volume:/home/s4liou/app/staticfiles
+      - media_volume:/home/s4liou/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8000 backend.wsgi:application"
+
+  # Service Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: react_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # Service pgAdmin (optionnel pour gérer la base de données)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: gayesaliou58@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: Passer@1234
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  static_volume:
+    driver: local
+  media_volume:
+    driver: local

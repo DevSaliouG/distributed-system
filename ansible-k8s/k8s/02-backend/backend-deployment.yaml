@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: distributed-app
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: devsalioug/site1_backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        - name: POSTGRES_DB
+          value: ecommerce
+        - name: POSTGRES_USER
+          value: s4liou
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-password 
+        - name: DATABASE_HOST
+          value: postgres-service     # Assure que settings.py reçoit bien cette valeur
+        
+        # Ajout par sécurité au cas où l'image utiliserait d'autres conventions
+        - name: POSTGRES_HOST
+          value: postgres-service
+
+        - name: DJANGO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: django-secret-key
+        - name: DJANGO_DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DJANGO_DEBUG
+        - name: DJANGO_ALLOWED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DJANGO_ALLOWED_HOSTS
+        - name: DJANGO_SETTINGS_MODULE
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: DJANGO_SETTINGS_MODULE
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /admin/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /admin/
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            echo "Waiting for PostgreSQL at postgres-service:5432..."
+            # Script Python simple pour attendre la DB (fonctionne sur toute image Python)
+            python -c "import socket, time; 
+            while True:
+                try:
+                    s=socket.socket(socket.AF_INET, socket.SOCK_STREAM);
+                    s.settimeout(1);
+                    s.connect(('postgres-service', 5432));
+                    s.close();
+                    break;
+                except Exception:
+                    time.sleep(1)"
+            echo "PostgreSQL started"
+            
+            python manage.py migrate &&
+            python manage.py collectstatic --noinput &&
+            gunicorn --bind 0.0.0.0:8000 backend.wsgi:application

@@ -1,0 +1,21 @@
+- name: Create app directory
+  file:
+    path: "/home/{{ ansible_user }}/app-k8s"
+    state: directory
+
+- name: Copy manifests
+  copy:
+    src: k8s/
+    dest: /home/{{ ansible_user }}/app-k8s/
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Deploy namespace
+  become_user: "{{ ansible_user }}"
+  command: kubectl apply -f /home/{{ ansible_user }}/app-k8s/00-namespace.yaml
+
+- name: Deploy all resources
+  become_user: "{{ ansible_user }}"
+  shell: kubectl apply -f /home/{{ ansible_user }}/app-k8s/
+

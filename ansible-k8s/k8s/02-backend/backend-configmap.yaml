@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: distributed-app
+data:
+  DJANGO_SETTINGS_MODULE: "backend.settings"
+  DJANGO_DEBUG: "False"
+  # J'ai ajouté le nom du service backend ici pour être sûr
+  DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,backend-service,frontend-service,distributed-app.local,backend"
+  # Assurez-vous que "postgres-service" est bien le nom exact du Service K8s de votre base de données
+  DATABASE_URL: "postgresql://s4liou:s4liou%401234@postgres-service:5432/ecommerce"
+  REACT_APP_API_URL: "http://distributed-app.local/api"

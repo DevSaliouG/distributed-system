@@ -1,0 +1,30 @@
+- name: Initialize Kubernetes cluster
+  command: kubeadm init --apiserver-advertise-address=172.20.10.2 --kubernetes-version=v1.28.0
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Create .kube directory
+  file:
+    path: /home/{{ ansible_user }}/.kube
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copy admin.conf
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ ansible_user }}/.kube/config
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Install Calico network
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+
+- name: Generate join command
+  shell: kubeadm token create --print-join-command
+  register: join_command
