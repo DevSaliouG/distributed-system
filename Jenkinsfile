@@ -61,6 +61,12 @@ pipeline {
             }
         }
 
+        stage('Debug Credentials') {
+            steps {
+                echo "Using credentials ID: ${DOCKER_HUB_CREDENTIALS_ID}"
+            }
+        }
+
         stage('Push vers Docker Hub') {
             steps {
                 withCredentials([usernamePassword(
