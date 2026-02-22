@@ -13,26 +13,35 @@ pipeline {
         stage('Linting et Tests') {
             parallel {
                 stage('Backend tests') {
+                    agent {
+                        docker {
+                            image 'python:3.11-slim'
+                            args '-v /var/run/docker.sock:/var/run/docker.sock'
+                        }
+                    }
                     steps {
                         dir('backend') {
                             sh '''
-                                python3 -m venv venv
-                                . venv/bin/activate
                                 pip install --upgrade pip
                                 pip install -r requirements.txt
+                                pip install flake8
                                 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
                                 python manage.py test
-                                deactivate
                             '''
                         }
                     }
                 }
                 stage('Frontend tests') {
+                    agent {
+                        docker {
+                            image 'node:18'
+                            args '-v /var/run/docker.sock:/var/run/docker.sock'
+                        }
+                    }
                     steps {
                         dir('frontend') {
                             sh '''
                                 npm install
-                                # Exécute les scripts s'ils existent, sinon ignore
                                 npm run lint || true
                                 npm test -- --watchAll=false || true
                             '''
