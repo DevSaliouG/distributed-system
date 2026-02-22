@@ -10,41 +10,44 @@ pipeline {
     }
 
     stages {
+
         stage('Linting et Tests') {
             parallel {
+
                 stage('Backend tests') {
-                    agent {
-                        docker {
-                            image 'python:3.11-slim'
-                            args '-v /var/run/docker.sock:/var/run/docker.sock'
-                        }
-                    }
                     steps {
                         dir('backend') {
-                            sh '''
-                                pip install --upgrade pip
-                                pip install -r requirements.txt
-                                pip install flake8
-                                flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-                                python manage.py test
-                            '''
+                            sh """
+                                docker run --rm \
+                                    -v \$PWD:/app \
+                                    -w /app \
+                                    python:3.11-slim \
+                                    sh -c "
+                                        pip install --upgrade pip &&
+                                        pip install -r requirements.txt &&
+                                        pip install flake8 &&
+                                        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics &&
+                                        python manage.py test
+                                    "
+                            """
                         }
                     }
                 }
+
                 stage('Frontend tests') {
-                    agent {
-                        docker {
-                            image 'node:18'
-                            args '-v /var/run/docker.sock:/var/run/docker.sock'
-                        }
-                    }
                     steps {
                         dir('frontend') {
-                            sh '''
-                                npm install
-                                npm run lint || true
-                                npm test -- --watchAll=false || true
-                            '''
+                            sh """
+                                docker run --rm \
+                                    -v \$PWD:/app \
+                                    -w /app \
+                                    node:18 \
+                                    sh -c "
+                                        npm install &&
+                                        npm run lint || true &&
+                                        npm test -- --watchAll=false || true
+                                    "
+                            """
                         }
                     }
                 }
@@ -53,25 +56,26 @@ pipeline {
 
         stage('Build des images Docker') {
             steps {
-                dir('backend') {
-                    sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ."
-                }
-                dir('frontend') {
-                    sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ."
-                }
+                sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ./backend"
+                sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ./frontend"
             }
         }
 
         stage('Push vers Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDENTIALS_ID,
-                                                   passwordVariable: 'DOCKER_PWD',
-                                                   usernameVariable: 'DOCKER_USR')]) {
-                    sh 'echo "$DOCKER_PWD" | docker login -u "$DOCKER_USR" --password-stdin'
-                    sh "docker push ${BACKEND_IMAGE}:${IMAGE_TAG}"
-                    sh "docker push ${BACKEND_IMAGE}:latest"
-                    sh "docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                    sh "docker push ${FRONTEND_IMAGE}:latest"
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKER_HUB_CREDENTIALS_ID}",
+                    passwordVariable: 'DOCKER_PWD',
+                    usernameVariable: 'DOCKER_USR'
+                )]) {
+
+                    sh '''
+                        echo "$DOCKER_PWD" | docker login -u "$DOCKER_USR" --password-stdin
+                        docker push '"${BACKEND_IMAGE}:${IMAGE_TAG}"'
+                        docker push '"${BACKEND_IMAGE}:latest"'
+                        docker push '"${FRONTEND_IMAGE}:${IMAGE_TAG}"'
+                        docker push '"${FRONTEND_IMAGE}:latest"'
+                    '''
                 }
             }
         }
@@ -90,7 +94,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout'
+            sh 'docker logout || true'
             cleanWs()
         }
         success {
