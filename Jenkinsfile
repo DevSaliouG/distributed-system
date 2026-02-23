@@ -69,19 +69,14 @@ pipeline {
 
         stage('Push vers Docker Hub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "${DOCKER_HUB_CREDENTIALS_ID}",
-                    passwordVariable: 'DOCKER_PWD',
-                    usernameVariable: 'DOCKER_USR'
-                )]) {
-
-                    sh '''
-                        echo "$DOCKER_PWD" | docker login -u "$DOCKER_USR" --password-stdin
-                        docker push '"${BACKEND_IMAGE}:${IMAGE_TAG}"'
-                        docker push '"${BACKEND_IMAGE}:latest"'
-                        docker push '"${FRONTEND_IMAGE}:${IMAGE_TAG}"'
-                        docker push '"${FRONTEND_IMAGE}:latest"'
-                    '''
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDENTIALS_ID,
+                                                passwordVariable: 'DOCKER_PWD',
+                                                usernameVariable: 'DOCKER_USR')]) {
+                    sh 'echo "$DOCKER_PWD" | docker login -u "$DOCKER_USR" --password-stdin'
+                    sh "docker push ${BACKEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${BACKEND_IMAGE}:latest"
+                    sh "docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${FRONTEND_IMAGE}:latest"
                 }
             }
         }
